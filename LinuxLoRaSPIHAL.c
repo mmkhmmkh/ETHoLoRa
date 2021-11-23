@@ -136,7 +136,8 @@ void HAL_End(void) {
 //}
 
 void HAL_Delay(uint32_t millis) {
-    mdelay(millis);
+//    mdelay(millis);
+    msleep(millis);
 }
 
 void HAL_GPIO_FreePin(uint8_t pin) {

@@ -36,6 +36,7 @@ MODULE_AUTHOR("MMKH <vbha.mmk@gmail.com>");
 
 #define NET_DEV "eth0"
 #define REC_INTERVAL 50
+#define TRN_INTERVAL 40
 #define MAX_PACKET_SIZE 255
 
 //unsigned char LORA_MAC[] = {
@@ -43,10 +44,11 @@ MODULE_AUTHOR("MMKH <vbha.mmk@gmail.com>");
 //};
 
 unsigned char CLIENT_MAC[] = {
-        0x74, 0xD0, 0x2B, 0xC1, 0xAD, 0x72
+        0x34, 0x97, 0xf6, 0x5a, 0x3d, 0x72
 };
 // MW: 0x74, 0xD0, 0x2B, 0xC1, 0xAD, 0x72
 // WS: 0x34, 0x97, 0xf6, 0x5a, 0x3d, 0x72
+// YUN: 0x90, 0xA2, 0xDA, 0xFB, 0x1E, 0x6B
 
 /*
  * RPI Pinout:
@@ -61,9 +63,16 @@ static uint8_t *buff_head;
 
 static struct nf_hook_ops *netfilter_ops_in; /* NF_IP_PRE_ROUTING */
 
+struct incoming_eth_t {
+    uint8_t total_length;
+    uint8_t data[MAX_PACKET_SIZE];
+};
+
 struct work_arg_struct {
-    struct sk_buff **skb_arr;
-    struct sk_buff **skb_arr_initial;
+//    struct sk_buff **skb_arr;
+//    struct sk_buff **skb_arr_initial;
+    struct incoming_eth_t *data_arr;
+    struct incoming_eth_t *data_arr_initial;
     unsigned int count;
     unsigned int real_count;
     unsigned int max_count;
@@ -97,154 +106,6 @@ static unsigned long receiver_interval;
 
 static int REC_READY;
 
-static void transmitter_handler(struct work_struct *work) {
-    uint8_t r = 1;
-    struct sk_buff *skb;
-    unsigned long flags;
-    unsigned int total_length;
-    unsigned char *head;
-    unsigned int sent_bytes;
-
-    if (!REC_READY) {
-
-        ON_T = 1;
-
-        if (ON_R == 1) {
-            printk(KERN_ALERT "[ETHoLoRa][Transmit][ALERT] Transmitter violated receiver atomicity.\n");
-        }
-
-//    printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] work_pool: %p\n", &work_pool);
-//    printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] skb_arr: %p\n", work_pool.skb_arr);
-//    printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] skb_arr[0]: %p\n", work_pool.skb_arr[0]);
-//    printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] lock: %p\n", &work_pool.lock);
-
-
-        if (work_pool.count > 0) {
-
-            printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] WorkPool count: %d\n", work_pool.count);
-
-            skb = work_pool.skb_arr[0];
-
-            spin_lock_irqsave(&work_pool.lock, flags);
-            work_pool.skb_arr += sizeof(void *);
-            work_pool.count--;
-            spin_unlock_irqrestore(&work_pool.lock, flags);
-//        printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] After unlock\n");
-            if (skb) {
-//            printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] Inside SKB\n");
-                total_length = skb->mac_len + skb->len;
-//            printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] Tot len: %d\n", total_length);
-                // Check for ETHoLoRa fragmentation
-                if (total_length < MAX_PACKET_SIZE) {
-//                printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] No frag. Set B0\n");
-//                printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] SKB address: %p\n", skb);
-//                printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] SKB MACH address: %p\n", skb_mac_header(skb));
-//                printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] SKB MACH[0]: %x\n", *skb_mac_header(skb));
-//                printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] Sizeof char: %d\n", sizeof(unsigned char));
-//                printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] Final addr: %p\n", (skb_mac_header(skb) - sizeof(unsigned char)));
-
-                    *((skb_mac_header(skb) - sizeof(unsigned char))) = 1;
-//                printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] No frag. Transmit\n");
-//                printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] new SKB MACH[0]: %x\n", *(skb_mac_header(skb) - sizeof(unsigned char)));
-//                printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] new SKB MACH[1]: %x\n", *(skb_mac_header(skb)));
-                    r = LoRa_transmit(&loRa, (skb_mac_header(skb) - sizeof(unsigned char)), total_length + 1, 10000);
-                } else {
-//                printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] Frag! Set B0 head\n");
-                    head = (skb_mac_header(skb) - sizeof(unsigned char));
-                    sent_bytes = 0;
-                    while (total_length - sent_bytes > MAX_PACKET_SIZE - 1) {
-//                    printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] Frag! %d left.\n", total_length - sent_bytes);
-                        *head = 0;
-//                    printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] Frag! Transmit\n");
-                        r = LoRa_transmit(&loRa, head, MAX_PACKET_SIZE, 10000);
-                        sent_bytes += MAX_PACKET_SIZE - 1;
-                        printk(KERN_INFO "[ETHoLoRa][Transmit][INFO] Sent %d out of %d bytes [status: %d].\n",
-                               sent_bytes, total_length, r);
-                        head += MAX_PACKET_SIZE - 1;
-                    }
-                    *head = 1;
-//                printk(KERN_INFO "[ETHoLoRa][Transmit][INFO] head: %p tot-sent+1: %d\n", head, total_length - sent_bytes + 1);
-                    r = LoRa_transmit(&loRa, head, total_length - sent_bytes + 1, 10000);
-                }
-
-                printk(KERN_INFO "[ETHoLoRa][Transmit][INFO] Sent %d bytes [status: %d].\n", total_length, r);
-                kfree_skb(skb);
-
-                if (skb) {
-                    skb = 0;
-                }
-            }
-
-            spin_lock_irqsave(&work_pool.lock, flags);
-            if (work_pool.count == 0) {
-                work_pool.skb_arr = work_pool.skb_arr_initial;
-                work_pool.real_count = 0;
-            }
-            spin_unlock_irqrestore(&work_pool.lock, flags);
-        }
-
-        ON_T = 0;
-    }
-
-//    queue_delayed_work(wq, &receiver, receiver_interval);
-//    queue_work(wq, &receiver);
-        if (work_pool.count > 0) {
-            queue_work(wq, &transmitter);
-        }
-
-    return;
-}
-
-
-static unsigned int nf_handler(unsigned int hooknum,
-                               struct sk_buff *skb,
-                               const struct net_device *in) {
-
-    unsigned long flags;
-
-    if (hooknum == NF_INET_PRE_ROUTING && strcmp(in->name, NET_DEV) == 0) {
-        printk(KERN_DEBUG "[ETHoLoRa][NFHook][DEBUG] New packet with %d bytes on %s!\n", skb->len, in->name);
-//    if (state->hook == NF_INET_PRE_ROUTING) {
-//        printk(KERN_DEBUG "[ETHoLoRa][NFHook][DEBUG] Packet is NF_INET_PRE_ROUTING.\n");
-
-        spin_lock_irqsave(&work_pool.lock, flags);
-        *(work_pool.skb_arr + (work_pool.count * sizeof(void *))) = skb;
-        if (work_pool.real_count < work_pool.max_count) {
-            ++work_pool.count;
-            ++work_pool.real_count;
-            // Auto reallocate [DISABLED]
-//            work_pool.max_count += 100;
-//            work_pool.skb_arr = krealloc(work_pool.skb_arr, sizeof(void *) * work_pool.max_count, GFP_ATOMIC);
-        }
-        spin_unlock_irqrestore(&work_pool.lock, flags);
-
-        queue_work(wq, &transmitter);
-        return NF_STOLEN;
-    }
-    return NF_ACCEPT;
-}
-
-#ifndef KERN_NEW
-
-static unsigned int main_hook(unsigned int hooknum,
-                              struct sk_buff *skb,
-                              const struct net_device *in,
-                              const struct net_device *out,
-                              int (*okfn)(struct sk_buff *)) {
-//    printk(KERN_NOTICE "Old Hook!\n");
-    return nf_handler(hooknum, skb, in);
-}
-
-#else
-
-static unsigned int main_hook(void *priv,
-                       struct sk_buff *skb,
-                       const struct nf_hook_state *state) {
-//    printk(KERN_NOTICE "New Hook!\n");
-    return nf_handler(state->hook, skb, state->in);
-}
-
-#endif
 
 static void send_frame(unsigned char *data, unsigned int length) {
     struct net_device *dev = __dev_get_by_name(&init_net, NET_DEV);
@@ -272,8 +133,6 @@ static void send_frame(unsigned char *data, unsigned int length) {
     }
 }
 
-
-
 static void main_receive(void) {
     int c;
     int i;
@@ -290,7 +149,6 @@ static void main_receive(void) {
         if (c > 1 && tmp_buff[0] < 3) {
             // New packet!
             printk(KERN_INFO "[ETHoLoRa][Receive][INFO] Got %d bytes.\n", c);
-
             flag = 0;
 
             for (i = 1; i < (c > 13 ? 13 : c); i++) {
@@ -300,21 +158,27 @@ static void main_receive(void) {
                 }
             }
 
-            if (flag == 1) {
+            if (flag == 1 || tmp_buff[0] != 2) {
 //        if (c == 11) {
 //            printk("Data: ");
 //            int i = 0;
 //            for (i = 0; i < c; i++) printk("%02x:", tmp_buff[i]);
 //            printk("\n");
 //        }
+                if (tmp_buff[0] == 2) {
+                    buff_tail = buff_head;
+                }
 
                 memcpy(buff_tail, &tmp_buff[1], c - 1);
-                buff_tail += (c - 1) * sizeof(uint8_t);
+                buff_tail = &buff_tail[c - 1];
+//                buff_tail += (c - 1) * sizeof(uint8_t);
 
                 // Check for ETHoLoRa fragmentation
                 if (tmp_buff[0] == 1) {
                     send_frame(buff_head, (buff_tail - buff_head) / sizeof(uint8_t));
                     buff_tail = buff_head;
+                } else {
+                    queue_work(wq, &receiver);
                 }
             } else {
                 printk(KERN_INFO "[ETHoLoRa][Receive][INFO] Packet ignored.\n");
@@ -322,7 +186,154 @@ static void main_receive(void) {
         }
     }
     REC_READY = 0;
+
+    queue_work(wq, &transmitter);
 }
+
+
+static void transmitter_handler(struct work_struct *work) {
+    uint8_t r = 1;
+    struct incoming_eth_t *data;
+    unsigned long flags;
+    unsigned int d;
+
+    if (!REC_READY) {
+
+        ON_T = 1;
+
+        if (ON_R == 1) {
+            printk(KERN_ALERT "[ETHoLoRa][Transmit][ALERT] Transmitter violated receiver atomicity.\n");
+        }
+
+
+        if (work_pool.count > 0) {
+
+            printk(KERN_DEBUG "[ETHoLoRa][Transmit][DEBUG] WorkPool count: %d\n", work_pool.count);
+
+            spin_lock_irqsave(&work_pool.lock, flags);
+            data = &work_pool.data_arr[0];
+            work_pool.data_arr = &work_pool.data_arr[1];
+            work_pool.count--;
+            spin_unlock_irqrestore(&work_pool.lock, flags);
+
+            if (data && data->total_length > 0) {
+                r = LoRa_transmit(&loRa, data->data, data->total_length, 10000);
+
+
+                printk(KERN_INFO "[ETHoLoRa][Transmit][INFO] Sent %d bytes [status: %d].\n", data->total_length, r);
+
+                data->total_length = 0;
+            }
+
+            spin_lock_irqsave(&work_pool.lock, flags);
+            if (work_pool.count == 0) {
+                work_pool.data_arr = work_pool.data_arr_initial;
+                work_pool.real_count = 0;
+            }
+            spin_unlock_irqrestore(&work_pool.lock, flags);
+
+        }
+
+        ON_T = 0;
+    }
+
+        if (work_pool.count > 0) {
+            queue_work(wq, &receiver);
+            for (d = 0; d < TRN_INTERVAL; d++) {
+                if (REC_READY == 1) {
+                    return;
+                }
+                HAL_Delay(1);
+            }
+            queue_work(wq, &transmitter);
+        }
+
+    return;
+}
+
+static void increase_count(void) {
+    if (work_pool.real_count < work_pool.max_count) {
+        ++work_pool.count;
+        ++work_pool.real_count;
+        // Auto reallocate [DISABLED]
+//            work_pool.max_count += 100;
+//            work_pool.skb_arr = krealloc(work_pool.skb_arr, sizeof(void *) * work_pool.max_count, GFP_ATOMIC);
+    }
+}
+
+static unsigned int nf_handler(unsigned int hooknum,
+                               struct sk_buff *skb,
+                               const struct net_device *in) {
+
+    unsigned long flags;
+    unsigned int total_length;
+    unsigned char *head;
+    unsigned int sent_bytes;
+
+    if (skb && hooknum == NF_INET_PRE_ROUTING && strcmp(in->name, NET_DEV) == 0) {
+
+        total_length = skb->mac_len + skb->len;
+
+        printk(KERN_DEBUG "[ETHoLoRa][NFHook][DEBUG] New packet with %d bytes on %s!\n", total_length, in->name);
+
+        head = (skb_mac_header(skb) - sizeof(unsigned char));
+
+        spin_lock_irqsave(&work_pool.lock, flags);
+        if (total_length < MAX_PACKET_SIZE) {
+            memcpy(work_pool.data_arr[work_pool.count].data, head, total_length + 1);
+            work_pool.data_arr[work_pool.count].data[0] = 1;
+            work_pool.data_arr[work_pool.count].total_length = total_length + 1;
+//            printk(KERN_ERR "[ETHoLoRa][Transmit][DEBUG] Set totlen to: %d\n", total_length + 1);
+//            printk(KERN_ERR "[ETHoLoRa][Transmit][DEBUG] Address of totlen is %p\n", &work_pool.data_arr[work_pool.count].total_length);
+        } else {
+
+            sent_bytes = 0;
+            while (total_length - sent_bytes > MAX_PACKET_SIZE - 1) {
+                memcpy(work_pool.data_arr[work_pool.count].data, head, MAX_PACKET_SIZE);
+                work_pool.data_arr[work_pool.count].data[0] = (sent_bytes == 0 ? 2 : 0); // 2 for first, 0 for rest, 1 for last.
+                work_pool.data_arr[work_pool.count].total_length = MAX_PACKET_SIZE;
+//                printk(KERN_ERR "[ETHoLoRa][Transmit][DEBUG] Set totlen to: %d\n", MAX_PACKET_SIZE);
+//                printk(KERN_ERR "[ETHoLoRa][Transmit][DEBUG] Address of totlen is %p\n", &work_pool.data_arr[work_pool.count].total_length);
+                sent_bytes += MAX_PACKET_SIZE - 1;
+                head += MAX_PACKET_SIZE - 1;
+                increase_count();
+            }
+            memcpy(work_pool.data_arr[work_pool.count].data, head, total_length - sent_bytes + 1);
+            work_pool.data_arr[work_pool.count].data[0] = 1;
+            work_pool.data_arr[work_pool.count].total_length = total_length - sent_bytes + 1;
+//            printk(KERN_ERR "[ETHoLoRa][Transmit][DEBUG] Set totlen to: %d\n", total_length - sent_bytes + 1);
+//            printk(KERN_ERR "[ETHoLoRa][Transmit][DEBUG] Address of totlen is %p\n", &work_pool.data_arr[work_pool.count].total_length);
+        }
+        increase_count();
+        spin_unlock_irqrestore(&work_pool.lock, flags);
+
+        queue_work(wq, &transmitter);
+        return NF_DROP;
+    }
+    return NF_ACCEPT;
+}
+
+#ifndef KERN_NEW
+
+static unsigned int main_hook(unsigned int hooknum,
+                              struct sk_buff *skb,
+                              const struct net_device *in,
+                              const struct net_device *out,
+                              int (*okfn)(struct sk_buff *)) {
+//    printk(KERN_NOTICE "Old Hook!\n");
+    return nf_handler(hooknum, skb, in);
+}
+
+#else
+
+static unsigned int main_hook(void *priv,
+                       struct sk_buff *skb,
+                       const struct nf_hook_state *state) {
+//    printk(KERN_NOTICE "New Hook!\n");
+    return nf_handler(state->hook, skb, state->in);
+}
+
+#endif
 
 
 static void receiver_handler(struct work_struct *work) {
@@ -330,7 +341,7 @@ static void receiver_handler(struct work_struct *work) {
     main_receive();
 //    queue_delayed_work(wq, &receiver, receiver_interval);
 //
-    queue_work(wq, &transmitter);
+
     ON_R = 0;
     return;
 }
@@ -393,9 +404,11 @@ static int __init etholora_init(void) {
         work_pool.count = 0;
         work_pool.real_count = 0;
         work_pool.max_count = 1000;
-        work_pool.skb_arr_initial = kcalloc(work_pool.max_count, sizeof(void *), GFP_ATOMIC);
+//        work_pool.skb_arr_initial = kcalloc(work_pool.max_count, sizeof(void *), GFP_ATOMIC);
+        work_pool.data_arr_initial = kcalloc(work_pool.max_count, sizeof(struct incoming_eth_t), GFP_ATOMIC);
         printk(KERN_NOTICE "[ETHoLoRa][Init][NOTICE] Work queue allocated %d bytes.\n", sizeof(void *) * work_pool.max_count);
-        work_pool.skb_arr = work_pool.skb_arr_initial;
+//        work_pool.skb_arr = work_pool.skb_arr_initial;
+        work_pool.data_arr = work_pool.data_arr_initial;
 
         spin_lock_init(&work_pool.lock);
         printk(KERN_NOTICE "[ETHoLoRa][Init][NOTICE] Queue lock initiated.\n");
@@ -423,7 +436,8 @@ static void __exit etholora_exit(void) {
             destroy_workqueue(wq);
         }
         LoRa_end(&loRa);
-        kfree(work_pool.skb_arr);
+//        kfree(work_pool.skb_arr_initial);
+        kfree(work_pool.data_arr_initial);
         kfree(buff_head);
     }
 }
