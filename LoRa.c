@@ -32,7 +32,7 @@ LoRa newLoRa(irq_handler_t handler){
     new_LoRa.crcRate               = CR_4_5    ;
     new_LoRa.power				   = POWER_20db;
     new_LoRa.overCurrentProtection = 120       ;
-    new_LoRa.preamble			   = 8         ;
+    new_LoRa.preamble			   = 6         ;
 
     HAL_Init(SPI_BUS);
 
@@ -270,7 +270,9 @@ void LoRa_setTOMsb_setCRCon(LoRa* _LoRa){
 
     read = LoRa_read(_LoRa, RegModemConfig2);
 
-    data = read | 0x07;
+//    data = read | 0x07;
+    // Disable CRC!
+    data = (read & 0xF8) | 0x03;
     LoRa_write(_LoRa, RegModemConfig2, data);\
 	HAL_Delay(10);
 }
