@@ -5,6 +5,9 @@
 
 #include "LinuxLoRaSPIHAL.c"
 
+#define ceil(n, d) (((n) < 0) ? (-((-(n))/(d))) : (n)/(d) + ((n)%(d) != 0))
+//#define floor(n, d) (((n) < 0) ? (-((-(n))/(d))) - ((n)%(d) != 0) : (n)/(d))
+
 /* -------------------------------------------------- \\
 // |                                                | \\
 // |            WRITTEN BY: Salman Motlaq           | \\
@@ -42,6 +45,7 @@
 #define CR_4_8						4
 
 //--- SPREADING FACTORS ---//
+#define SF_6							6
 #define SF_7							7
 #define SF_8							8
 #define SF_9							9
@@ -77,6 +81,8 @@
 #define RegPreambleMsb				0x20
 #define RegPreambleLsb				0x21
 #define RegPayloadLength			0x22
+#define RegDetectOptimize           0x31
+#define RegDetectionThreshold       0x37
 #define RegDioMapping1				0x40
 #define RegDioMapping2				0x41
 #define RegVersion						0x42
@@ -137,3 +143,4 @@ int LoRa_getRSSI(LoRa* _LoRa);
 uint16_t LoRa_init(LoRa* _LoRa);
 void LoRa_end(LoRa* _LoRa);
 
+uint32_t LoRa_calculateTOA(LoRa* _LoRa, uint8_t length);

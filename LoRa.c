@@ -3,6 +3,7 @@
 //
 
 #include "LoRa.h"
+
 #define RESET_PIN 117
 #define NSS_PIN 112
 #define DIO0_PIN 129
@@ -23,16 +24,16 @@
 											| 		    coding rate = 4/5            |
 											----------------------------------------
 \* ----------------------------------------------------------------------------- */
-LoRa newLoRa(irq_handler_t handler){
+LoRa newLoRa(irq_handler_t handler) {
     LoRa new_LoRa;
 
-    new_LoRa.frequency             = 433       ;
-    new_LoRa.spredingFactor        = SF_7      ;
-    new_LoRa.bandWidth			   = BW_500KHz ;
-    new_LoRa.crcRate               = CR_4_5    ;
-    new_LoRa.power				   = POWER_20db;
-    new_LoRa.overCurrentProtection = 120       ;
-    new_LoRa.preamble			   = 6         ;
+    new_LoRa.frequency = 433;
+    new_LoRa.spredingFactor = SF_6;
+    new_LoRa.bandWidth = BW_500KHz;
+    new_LoRa.crcRate = CR_4_5;
+    new_LoRa.power = POWER_20db;
+    new_LoRa.overCurrentProtection = 120;
+    new_LoRa.preamble = 6;
 
     HAL_Init(SPI_BUS);
 
@@ -44,7 +45,7 @@ LoRa newLoRa(irq_handler_t handler){
     return new_LoRa;
 }
 
-void LoRa_end(LoRa* _LoRa) {
+void LoRa_end(LoRa *_LoRa) {
     HAL_GPIO_FreeIRQ(DIO0_PIN);
     HAL_GPIO_FreePin(RESET_PIN);
     HAL_GPIO_FreePin(NSS_PIN);
@@ -60,7 +61,7 @@ void LoRa_end(LoRa* _LoRa) {
 			LoRa* LoRa --> LoRa object handler
 		returns     : Nothing
 \* ----------------------------------------------------------------------------- */
-void LoRa_reset(LoRa* _LoRa){
+void LoRa_reset(LoRa *_LoRa) {
     HAL_GPIO_WritePin(RESET_PIN, 0);
     HAL_Delay(10);
     HAL_GPIO_WritePin(RESET_PIN, 1);
@@ -75,26 +76,26 @@ void LoRa_reset(LoRa* _LoRa){
 			mode	        --> select from defined modes
 		returns     : Nothing
 \* ----------------------------------------------------------------------------- */
-void LoRa_gotoMode(LoRa* _LoRa, int mode){
-    uint8_t    read;
-    uint8_t    data;
+void LoRa_gotoMode(LoRa *_LoRa, int mode) {
+    uint8_t read;
+    uint8_t data;
 
     read = LoRa_read(_LoRa, RegOpMode);
     data = read;
 
-    if(mode == SLEEP_MODE){
+    if (mode == SLEEP_MODE) {
         data = (read & 0xF8) | 0x00;
         _LoRa->current_mode = SLEEP_MODE;
-    }else if (mode == STNBY_MODE){
+    } else if (mode == STNBY_MODE) {
         data = (read & 0xF8) | 0x01;
         _LoRa->current_mode = STNBY_MODE;
-    }else if (mode == TRANSMIT_MODE){
+    } else if (mode == TRANSMIT_MODE) {
         data = (read & 0xF8) | 0x03;
         _LoRa->current_mode = TRANSMIT_MODE;
-    }else if (mode == RXCONTIN_MODE){
+    } else if (mode == RXCONTIN_MODE) {
         data = (read & 0xF8) | 0x05;
         _LoRa->current_mode = RXCONTIN_MODE;
-    }else if (mode == RXSINGLE_MODE){
+    } else if (mode == RXSINGLE_MODE) {
         data = (read & 0xF8) | 0x06;
         _LoRa->current_mode = RXSINGLE_MODE;
     }
@@ -117,7 +118,7 @@ void LoRa_gotoMode(LoRa* _LoRa, int mode){
 			uint16_t w_length	--> detemines number of bytes that you want to read
 		returns     : Nothing
 \* ----------------------------------------------------------------------------- */
-void LoRa_readReg(LoRa* _LoRa, uint8_t* address, uint16_t r_length, uint8_t* output, uint16_t w_length){
+void LoRa_readReg(LoRa *_LoRa, uint8_t *address, uint16_t r_length, uint8_t *output, uint16_t w_length) {
     HAL_GPIO_WritePin(NSS_PIN, 0);
 //    HAL_Delay(1);
     HAL_SPI_Transmit(address, r_length);
@@ -144,7 +145,7 @@ void LoRa_readReg(LoRa* _LoRa, uint8_t* address, uint16_t r_length, uint8_t* out
 			uint16_t w_length	--> detemines number of bytes that you want to send
 		returns     : Nothing
 \* ----------------------------------------------------------------------------- */
-void LoRa_writeReg(LoRa* _LoRa, uint8_t* address, uint16_t r_length, uint8_t* values, uint16_t w_length){
+void LoRa_writeReg(LoRa *_LoRa, uint8_t *address, uint16_t r_length, uint8_t *values, uint16_t w_length) {
     HAL_GPIO_WritePin(NSS_PIN, 0);
 //    HAL_Delay(1);
     HAL_SPI_Transmit(address, r_length);
@@ -167,10 +168,10 @@ void LoRa_writeReg(LoRa* _LoRa, uint8_t* address, uint16_t r_length, uint8_t* va
 			int   freq        --> desired frequency in MHz unit, e.g 434
 		returns     : Nothing
 \* ----------------------------------------------------------------------------- */
-void LoRa_setFrequency(LoRa* _LoRa, int freq){
-    uint8_t  data;
+void LoRa_setFrequency(LoRa *_LoRa, int freq) {
+    uint8_t data;
     uint32_t F;
-    F = (freq * 524288)>>5;
+    F = (freq * 524288) >> 5;
 
     // write Msb:
     data = F >> 16;
@@ -190,20 +191,22 @@ void LoRa_setFrequency(LoRa* _LoRa, int freq){
 
 /* ----------------------------------------------------------------------------- *\
 		name        : LoRa_setSpreadingFactor
-		description : set spreading factor, from 7 to 12.
+		description : set spreading factor, from 6 to 12.
 		arguments   :
 			LoRa* LoRa        --> LoRa object handler
 			int   SP          --> desired spreading factor e.g 7
 		returns     : Nothing
 \* ----------------------------------------------------------------------------- */
-void LoRa_setSpreadingFactor(LoRa* _LoRa, int SF){
-    uint8_t	data;
-    uint8_t	read;
+void LoRa_setSpreadingFactor(LoRa *_LoRa, int SF) {
+    uint8_t data;
+    uint8_t read;
 
-    if(SF>12)
+    if (SF > 12)
         SF = 12;
-    if(SF<7)
-        SF = 7;
+    if (SF < 6)
+        SF = 6;
+
+    _LoRa->spredingFactor = SF;
 
     read = LoRa_read(_LoRa, RegModemConfig2);
     HAL_Delay(10);
@@ -211,6 +214,32 @@ void LoRa_setSpreadingFactor(LoRa* _LoRa, int SF){
     data = (SF << 4) + (read & 0x0F);
     LoRa_write(_LoRa, RegModemConfig2, data);
     HAL_Delay(10);
+
+    // Set additional regs for SF = 6
+
+    // Set implicit/explicit header
+    read = LoRa_read(_LoRa, RegModemConfig1);
+    HAL_Delay(10);
+
+    data = (SF == 6 ? 1 : 0) + (read & 0xFE);
+    LoRa_write(_LoRa, RegModemConfig1, data);
+    HAL_Delay(10);
+
+    // Set RegDetectOptimize (0x05 for SF6)
+    read = LoRa_read(_LoRa, RegDetectOptimize);
+    HAL_Delay(10);
+
+    data = (SF == 6 ? 0x05 : 0x03) + (read & 0xF8);
+    LoRa_write(_LoRa, RegDetectOptimize, data);
+    HAL_Delay(10);
+
+
+    // Set RegDetectionThreshold (0x0C for SF6)
+    data = (SF == 6 ? 0x0C : 0x0A);
+    LoRa_write(_LoRa, RegDetectionThreshold, data);
+    HAL_Delay(10);
+
+
 }
 
 /* ----------------------------------------------------------------------------- *\
@@ -221,7 +250,7 @@ void LoRa_setSpreadingFactor(LoRa* _LoRa, int SF){
 			int   power       --> desired power e.g POWER_17db
 		returns     : Nothing
 \* ----------------------------------------------------------------------------- */
-void LoRa_setPower(LoRa* _LoRa, uint8_t power){
+void LoRa_setPower(LoRa *_LoRa, uint8_t power) {
     LoRa_write(_LoRa, RegPaConfig, power);
     HAL_Delay(10);
 }
@@ -265,7 +294,7 @@ void LoRa_setPower(LoRa* _LoRa, uint8_t power){
 			LoRa* LoRa        --> LoRa object handler
 		returns     : Nothing
 \* ----------------------------------------------------------------------------- */
-void LoRa_setTOMsb_setCRCon(LoRa* _LoRa){
+void LoRa_setTOMsb_setCRCon(LoRa *_LoRa) {
     uint8_t read, data;
 
     read = LoRa_read(_LoRa, RegModemConfig2);
@@ -274,7 +303,7 @@ void LoRa_setTOMsb_setCRCon(LoRa* _LoRa){
     // Disable CRC!
     data = (read & 0xF8) | 0x03;
     LoRa_write(_LoRa, RegModemConfig2, data);\
-	HAL_Delay(10);
+    HAL_Delay(10);
 }
 
 /* ----------------------------------------------------------------------------- *\
@@ -285,7 +314,7 @@ void LoRa_setTOMsb_setCRCon(LoRa* _LoRa){
 			uint8_t address     -->	address of the register e.g 0x1D
 		returns     : register value
 \* ----------------------------------------------------------------------------- */
-uint8_t LoRa_read(LoRa* _LoRa, uint8_t address){
+uint8_t LoRa_read(LoRa *_LoRa, uint8_t address) {
     uint8_t read_data;
     uint8_t data_addr;
 
@@ -305,7 +334,7 @@ uint8_t LoRa_read(LoRa* _LoRa, uint8_t address){
 			uint8_t value       --> value that you want to write
 		returns     : Nothing
 \* ----------------------------------------------------------------------------- */
-void LoRa_write(LoRa* _LoRa, uint8_t address, uint8_t value){
+void LoRa_write(LoRa *_LoRa, uint8_t address, uint8_t value) {
     uint8_t data;
     uint8_t addr;
 
@@ -324,7 +353,7 @@ void LoRa_write(LoRa* _LoRa, uint8_t address, uint8_t value){
 			uint8_t *value      --> address of values that you want to write
 		returns     : Nothing
 \* ----------------------------------------------------------------------------- */
-void LoRa_BurstWrite(LoRa* _LoRa, uint8_t address, uint8_t *value, uint8_t length){
+void LoRa_BurstWrite(LoRa *_LoRa, uint8_t address, uint8_t *value, uint8_t length) {
     uint8_t addr;
     addr = address | 0x80;
 
@@ -336,6 +365,7 @@ void LoRa_BurstWrite(LoRa* _LoRa, uint8_t address, uint8_t *value, uint8_t lengt
     //  HAL_Delay(2);
 //    while (HAL_SPI_GetState(_LoRa->hSPIx) != HAL_SPI_STATE_READY)
 //        ;
+
     //Write data in FiFo
     HAL_SPI_Transmit(value, length);
 
@@ -347,6 +377,7 @@ void LoRa_BurstWrite(LoRa* _LoRa, uint8_t address, uint8_t *value, uint8_t lengt
     HAL_GPIO_WritePin(NSS_PIN, 1);
 //    HAL_Delay(1);
 }
+
 /* ----------------------------------------------------------------------------- *\
 		name        : LoRa_isvalid
 		description : check the LoRa instruct values
@@ -354,7 +385,7 @@ void LoRa_BurstWrite(LoRa* _LoRa, uint8_t address, uint8_t *value, uint8_t lengt
 			LoRa* LoRa --> LoRa object handler
 		returns     : returns 1 if all of the values were given, otherwise returns 0
 \* ----------------------------------------------------------------------------- */
-uint8_t LoRa_isvalid(LoRa* _LoRa){
+uint8_t LoRa_isvalid(LoRa *_LoRa) {
 
     return 1;
 }
@@ -369,25 +400,32 @@ uint8_t LoRa_isvalid(LoRa* _LoRa){
 			uint16_t timeOut	--> Timeout in milliseconds
 		returns     : 1 in case of success, 0 in case of timeout
 \* ----------------------------------------------------------------------------- */
-uint8_t LoRa_transmit(LoRa* _LoRa, uint8_t* data, uint8_t length, uint16_t timeout){
+uint8_t LoRa_transmit(LoRa *_LoRa, uint8_t *data, uint8_t length, uint16_t timeout) {
     uint8_t read;
+    uint8_t tmp_data[255];
+
     int mode = _LoRa->current_mode;
     LoRa_gotoMode(_LoRa, STNBY_MODE);
-    read = LoRa_read(_LoRa, RegFiFoTxBaseAddr);
-    LoRa_write(_LoRa, RegFiFoAddPtr, read);
-    LoRa_write(_LoRa, RegPayloadLength, length);
-    LoRa_BurstWrite(_LoRa, RegFiFo, data, length);
+
+    memcpy(_LoRa->spredingFactor == 6 ? &tmp_data[1] : tmp_data, data, length);
+    if (_LoRa->spredingFactor == 6)
+        tmp_data[0] = length;
+
+//    read = LoRa_read(_LoRa, RegFiFoTxBaseAddr);
+//    LoRa_write(_LoRa, RegFiFoAddPtr, read);
+    LoRa_write(_LoRa, RegFiFoAddPtr, 0);
+    LoRa_BurstWrite(_LoRa, RegFiFo, tmp_data, length + (_LoRa->spredingFactor == 6 ? 1 : 0));
+    LoRa_write(_LoRa, RegPayloadLength, length + (_LoRa->spredingFactor == 6 ? 1 : 0));
     LoRa_gotoMode(_LoRa, TRANSMIT_MODE);
-    while(1){
+    while (1) {
         read = LoRa_read(_LoRa, RegIrqFlags);
-        if((read & 0x08)!=0){
+        if ((read & 0x08) != 0) {
             LoRa_write(_LoRa, RegIrqFlags, 0xFF);
             HAL_Delay(1);
             LoRa_gotoMode(_LoRa, mode);
             return 1;
-        }
-        else{
-            if(--timeout==0){
+        } else {
+            if (--timeout == 0) {
                 LoRa_gotoMode(_LoRa, mode);
                 return 0;
             }
@@ -404,7 +442,7 @@ uint8_t LoRa_transmit(LoRa* _LoRa, uint8_t* data, uint8_t length, uint16_t timeo
 			LoRa*    LoRa     --> LoRa object handler
 		returns     : Nothing
 \* ----------------------------------------------------------------------------- */
-void LoRa_startReceiving(LoRa* _LoRa){
+void LoRa_startReceiving(LoRa *_LoRa) {
     LoRa_gotoMode(_LoRa, RXCONTIN_MODE);
 }
 
@@ -417,27 +455,38 @@ void LoRa_startReceiving(LoRa* _LoRa){
 			uint8_t	 length   --> Determines how many bytes you want to read
 		returns     : The number of bytes received
 \* ----------------------------------------------------------------------------- */
-uint8_t LoRa_receive(LoRa* _LoRa, uint8_t* data, uint8_t length){
+uint8_t LoRa_receive(LoRa *_LoRa, uint8_t *data, uint8_t length) {
     uint8_t read;
     uint8_t number_of_bytes;
     uint8_t min = 0;
-    int i=0;
-    for(i = 0; i<length; i++)
-        data[i]=0;
+    int i = 0;
+    for (i = 0; i < length; i++)
+        data[i] = 0;
 
-    LoRa_gotoMode(_LoRa, STNBY_MODE);
     read = LoRa_read(_LoRa, RegIrqFlags);
+    if (_LoRa->spredingFactor == 6)
+        LoRa_write(_LoRa, RegPayloadLength, 0xFF);
+
 //    printk(KERN_NOTICE "LoRa REC Flag: %x\n", read);
-    if((read & 0x40) != 0){
+    if ((read & 0x40) != 0) {
         LoRa_write(_LoRa, RegIrqFlags, 0xFF);
-        number_of_bytes = LoRa_read(_LoRa, RegRxNbBytes);
         read = LoRa_read(_LoRa, RegFiFoRxCurrentAddr);
         LoRa_write(_LoRa, RegFiFoAddPtr, read);
+        LoRa_gotoMode(_LoRa, STNBY_MODE);
+//        printk(KERN_ERR "Available: %d\n", LoRa_read(_LoRa, RegPayloadLength));
+        if (_LoRa->spredingFactor == 6)
+            number_of_bytes = LoRa_read(_LoRa, RegFiFo);
+        else
+            number_of_bytes = LoRa_read(_LoRa, RegRxNbBytes);
+//        if (_LoRa->spredingFactor == 6)
+//            LoRa_write(_LoRa, RegPayloadLength, number_of_bytes);
+//        printk(KERN_ERR "Now Available: %d\n", LoRa_read(_LoRa, RegPayloadLength));
         min = length >= number_of_bytes ? number_of_bytes : length;
-        for(i=0; i<min; i++)
+        for (i = 0; i < min; i++)
             data[i] = LoRa_read(_LoRa, RegFiFo);
+//        LoRa_write(_LoRa, RegFiFoAddPtr, 0);
+        LoRa_gotoMode(_LoRa, RXCONTIN_MODE);
     }
-    LoRa_gotoMode(_LoRa, RXCONTIN_MODE);
     return min;
 }
 
@@ -448,7 +497,7 @@ uint8_t LoRa_receive(LoRa* _LoRa, uint8_t* data, uint8_t length){
 			LoRa* LoRa        --> LoRa object handler
 		returns     : Returns the RSSI value of last received packet.
 \* ----------------------------------------------------------------------------- */
-int LoRa_getRSSI(LoRa* _LoRa){
+int LoRa_getRSSI(LoRa *_LoRa) {
     uint8_t read;
     read = LoRa_read(_LoRa, RegPktRssiValue);
     return -164 + read;
@@ -461,11 +510,11 @@ int LoRa_getRSSI(LoRa* _LoRa){
 			LoRa* LoRa        --> LoRa object handler
 		returns     : Nothing
 \* ----------------------------------------------------------------------------- */
-uint16_t LoRa_init(LoRa* _LoRa){
-    uint8_t    data;
-    uint8_t    read;
+uint16_t LoRa_init(LoRa *_LoRa) {
+    uint8_t data;
+    uint8_t read;
 
-    if(LoRa_isvalid(_LoRa)){
+    if (LoRa_isvalid(_LoRa)) {
         // goto sleep mode:
         LoRa_gotoMode(_LoRa, SLEEP_MODE);
         HAL_Delay(10);
@@ -479,6 +528,10 @@ uint16_t LoRa_init(LoRa* _LoRa){
 
         // set frequency:
         LoRa_setFrequency(_LoRa, _LoRa->frequency);
+
+        // set base addrs:
+        LoRa_write(_LoRa, RegFiFoRxBaseAddr, 0);
+        LoRa_write(_LoRa, RegFiFoTxBaseAddr, 0);
 
         // set output power gain:
         LoRa_setPower(_LoRa, _LoRa->power);
@@ -500,7 +553,7 @@ uint16_t LoRa_init(LoRa* _LoRa){
         // 8 bit RegModemConfig --> | X | X | X | X | X | X | X | X |
         //       bits represent --> |   bandwidth   |     CR    |I/E|
         data = 0;
-        data = (_LoRa->bandWidth << 4) + (_LoRa->crcRate << 1);
+        data = (_LoRa->bandWidth << 4) + (_LoRa->crcRate << 1) + (_LoRa->spredingFactor == 6 ? 1 : 0);
         LoRa_write(_LoRa, RegModemConfig1, data);
 
         // set preamble:
@@ -518,12 +571,76 @@ uint16_t LoRa_init(LoRa* _LoRa){
         HAL_Delay(10);
 
         read = LoRa_read(_LoRa, RegVersion);
-        if(read == 0x12)
+        if (read == 0x12)
             return LORA_OK;
         else
             return LORA_NOT_FOUND;
-    }
-    else {
+    } else {
         return LORA_UNAVAILABLE;
     }
+}
+
+uint32_t our_pow(uint32_t base, unsigned int exp) {
+    uint32_t result = 1;
+
+    while (exp) {
+        if (exp & 1)
+            result *= base;
+        exp >>= 1;
+        base *= base;
+    }
+
+    return result;
+}
+
+
+uint32_t LoRa_calculateTOA(LoRa *_LoRa, uint8_t length) {
+    uint32_t Tpre, Tpay, Tpacket, Ns, BW;
+
+    switch (_LoRa->bandWidth) {
+        case BW_7_8KHz:
+            BW = 8;
+            break;
+        case BW_10_4KHz:
+            BW = 11;
+            break;
+        case BW_15_6KHz:
+            BW = 16;
+            break;
+        case BW_20_8KHz:
+            BW = 21;
+            break;
+        case BW_31_25KHz:
+            BW = 32;
+            break;
+        case BW_41_7KHz:
+            BW = 42;
+            break;
+        case BW_62_5KHz:
+            BW = 63;
+            break;
+        case BW_125KHz:
+            BW = 125;
+            break;
+        case BW_250KHz:
+            BW = 250;
+            break;
+        case BW_500KHz:
+            BW = 500;
+            break;
+        default:
+            BW = 125;
+    }
+
+
+    Tpre = ((4 * _LoRa->preamble + 17) * our_pow(2, _LoRa->spredingFactor)) / (4 * BW);
+
+    Ns = 8 + 1 + ceil((8 * length - 4 * _LoRa->spredingFactor + 28 + 16 - 20 * (_LoRa->spredingFactor == 6 ? 1 : 0)),
+                      (4 * (_LoRa->spredingFactor))) * (_LoRa->crcRate + 4);
+
+    Tpay = (our_pow(2, _LoRa->spredingFactor) * Ns) / BW;
+
+    Tpacket = Tpre + Tpay;
+
+    return Tpacket;
 }

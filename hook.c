@@ -38,8 +38,8 @@ MODULE_AUTHOR("MMKH <vbha.mmk@gmail.com>");
 
 #define NET_DEV "eth0"
 #define REC_INTERVAL 50
-#define TRN_INTERVAL 3
-#define MAX_PACKET_SIZE 255
+//#define TRN_INTERVAL 2
+#define MAX_PACKET_SIZE 254
 
 //unsigned char LORA_MAC[] = {
 //        0x08, 0x90, 0x00, 0xa0, 0x90, 0x90
@@ -108,7 +108,7 @@ static unsigned long receiver_interval;
 
 static int REC_READY;
 
-//static uint64_t start;
+static uint64_t lastTransmission;
 
 static void send_frame(uint8_t *data, unsigned int length) {
     struct net_device *dev = __dev_get_by_name(&init_net, NET_DEV);
@@ -139,6 +139,7 @@ static void main_receive(void) {
 
 //    printk(" (%lld) ", (unsigned long long) (ktime_to_ns(ktime_get()) - start));
 
+    printk(KERN_INFO "[ETHoLoRa][Receive][INFO] Trying to RX...\n");
     // Check for incoming packets on LoRa...
     while ((c = LoRa_receive(&loRa, tmp_buff, MAX_PACKET_SIZE)) > 0) {
         if (c > 1 && tmp_buff[0] < 3) {
@@ -179,6 +180,10 @@ static void main_receive(void) {
 //            }
         }
     }
+                printk("Data (c=%d): ", c);
+            int i = 0;
+            for (i = 0; i < c; i++) printk("%02x:", tmp_buff[i]);
+            printk("\n");
     REC_READY = 0;
     queue_work(wq, &transmitter);
 }
@@ -189,6 +194,9 @@ static void transmitter_handler(struct work_struct *work) {
     struct incoming_eth_t *data;
     unsigned long flags;
     unsigned int d;
+    uint64_t _lastTransmission;
+    uint32_t  waittime;
+    unsigned char rnd;
 
     if (!REC_READY) {
 
@@ -210,7 +218,36 @@ static void transmitter_handler(struct work_struct *work) {
             spin_unlock_irqrestore(&work_pool.lock, flags);
 
             if (data && data->total_length > 0) {
+
+                _lastTransmission = ktime_to_ns(ktime_get());
+                printk(KERN_ERR "T-T time: %lld ns\n", (unsigned long long)(_lastTransmission - lastTransmission));
+
+//                uint8_t l = 0;
+//                for (l = 0; l < data->total_length; l++) {
+//                    data->data[l] = l;
+//                }
+//                data->data[0] = 1;
+
+//                printk("Data: ");
+//                int i = 0;
+//                for (i = 0; i < data->total_length; i++) printk("%02x:", data->data[i]);
+//                printk("\n");
+
                 r = LoRa_transmit(&loRa, data->data, data->total_length, 10000);
+
+                lastTransmission = _lastTransmission;
+
+                waittime = LoRa_calculateTOA(&loRa, data->total_length);
+                printk(KERN_ERR "ToA time: %d ms\n", waittime);
+
+//                mdelay(waittime);
+
+                get_random_bytes(&rnd, 1);
+                waittime = LoRa_calculateTOA(&loRa, 250) + (waittime * rnd / 255);
+
+                printk(KERN_ERR "MA time: %d ms\n", waittime);
+
+                mdelay(waittime);
 
 
                 printk(KERN_INFO "[ETHoLoRa][Transmit][INFO] Sent %d bytes [status: %d].\n", data->total_length, r);
@@ -231,12 +268,12 @@ static void transmitter_handler(struct work_struct *work) {
     }
 
     if (work_pool.count > 0) {
-        for (d = 0; d < TRN_INTERVAL; d++) {
-            if (REC_READY == 1) {
-                return;
-            }
-            msleep_interruptible(1);
-        }
+//        for (d = 0; d < TRN_INTERVAL; d++) {
+//            if (REC_READY == 1) {
+//                return;
+//            }
+//            msleep_interruptible(1);
+//        }
         queue_work(wq, &transmitter);
     }
 
@@ -341,7 +378,7 @@ static void receiver_handler(struct work_struct *work) {
 static irqreturn_t irqHandler(int irq, void *ident) {
 //    cancel_work_sync(&transmitter);
 //    start = ktime_to_ns(ktime_get());
-
+    printk(KERN_INFO "[ETHoLoRa][Receive][INFO] RX IRQ.\n");
 //    printk(KERN_ERR "RX IRQ %lld\n", (unsigned long long)start);
     if (status == 200) {
         REC_READY = 1;
@@ -382,8 +419,8 @@ static int __init etholora_init(void) {
     printk(KERN_NOTICE "[ETHoLoRa][Init][NOTICE] Frequency set to 433MHz.\n");
     LoRa_setPower(&loRa, POWER_20db);
     printk(KERN_NOTICE "[ETHoLoRa][Init][NOTICE] Power set to 20db.\n");
-    LoRa_setSpreadingFactor(&loRa, SF_7);
-    printk(KERN_NOTICE "[ETHoLoRa][Init][NOTICE] SF7 set.\n");
+    LoRa_setSpreadingFactor(&loRa, SF_6);
+    printk(KERN_NOTICE "[ETHoLoRa][Init][NOTICE] SF6 set.\n");
     LoRa_reset(&loRa);
     printk(KERN_NOTICE "[ETHoLoRa][Init][NOTICE] LoRa reset.\n");
     status = LoRa_init(&loRa);
