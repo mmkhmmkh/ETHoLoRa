@@ -39,15 +39,21 @@ MODULE_AUTHOR("MMKH <vbha.mmk@gmail.com>");
 #define NET_DEV "eth0"
 #define REC_INTERVAL 50
 //#define TRN_INTERVAL 2
-#define MAX_PACKET_SIZE 254
+#define MAX_PACKET_SIZE 255
 
 //unsigned char LORA_MAC[] = {
 //        0x08, 0x90, 0x00, 0xa0, 0x90, 0x90
 //};
 
+#ifdef KERN_NEW
+unsigned char CLIENT_MAC[] = {
+        0x90, 0xA2, 0xDA, 0xFB, 0x1E, 0x6B
+};
+#else
 unsigned char CLIENT_MAC[] = {
         0x34, 0x97, 0xf6, 0x5a, 0x3d, 0x72
 };
+#endif
 // MW: 0x74, 0xD0, 0x2B, 0xC1, 0xAD, 0x72
 // WS: 0x34, 0x97, 0xf6, 0x5a, 0x3d, 0x72
 // YUN: 0x90, 0xA2, 0xDA, 0xFB, 0x1E, 0x6B
@@ -126,6 +132,7 @@ static void send_frame(uint8_t *data, unsigned int length) {
     }
 }
 
+
 static void main_receive(void) {
     int c;
 //    int i;
@@ -136,6 +143,8 @@ static void main_receive(void) {
     if (ON_T == 1) {
         printk(KERN_ALERT "[ETHoLoRa][Receive][ALERT] Receiver violated transmitter atomicity.\n");
     }
+
+//    printk("Rec RSSI: %d\n", LoRa_getInstantRSSI(&loRa));
 
 //    printk(" (%lld) ", (unsigned long long) (ktime_to_ns(ktime_get()) - start));
 
@@ -180,10 +189,6 @@ static void main_receive(void) {
 //            }
         }
     }
-                printk("Data (c=%d): ", c);
-            int i = 0;
-            for (i = 0; i < c; i++) printk("%02x:", tmp_buff[i]);
-            printk("\n");
     REC_READY = 0;
     queue_work(wq, &transmitter);
 }
@@ -193,12 +198,14 @@ static void transmitter_handler(struct work_struct *work) {
     uint8_t r = 1;
     struct incoming_eth_t *data;
     unsigned long flags;
-    unsigned int d;
+//    unsigned int d;
     uint64_t _lastTransmission;
     uint32_t  waittime;
     unsigned char rnd;
 
-    if (!REC_READY) {
+//    printk("Tmt RSSI: %d\n", LoRa_getInstantRSSI(&loRa));
+
+    if (!REC_READY && LoRa_getInstantRSSI(&loRa) < -100) {
 
         ON_T = 1;
 
@@ -239,15 +246,12 @@ static void transmitter_handler(struct work_struct *work) {
 
                 waittime = LoRa_calculateTOA(&loRa, data->total_length);
                 printk(KERN_ERR "ToA time: %d ms\n", waittime);
-
-//                mdelay(waittime);
-
                 get_random_bytes(&rnd, 1);
-                waittime = LoRa_calculateTOA(&loRa, 250) + (waittime * rnd / 255);
-
+                waittime = (waittime * rnd / 255);
                 printk(KERN_ERR "MA time: %d ms\n", waittime);
 
                 mdelay(waittime);
+
 
 
                 printk(KERN_INFO "[ETHoLoRa][Transmit][INFO] Sent %d bytes [status: %d].\n", data->total_length, r);
@@ -419,8 +423,8 @@ static int __init etholora_init(void) {
     printk(KERN_NOTICE "[ETHoLoRa][Init][NOTICE] Frequency set to 433MHz.\n");
     LoRa_setPower(&loRa, POWER_20db);
     printk(KERN_NOTICE "[ETHoLoRa][Init][NOTICE] Power set to 20db.\n");
-    LoRa_setSpreadingFactor(&loRa, SF_6);
-    printk(KERN_NOTICE "[ETHoLoRa][Init][NOTICE] SF6 set.\n");
+    LoRa_setSpreadingFactor(&loRa, SF_7);
+    printk(KERN_NOTICE "[ETHoLoRa][Init][NOTICE] SF7 set.\n");
     LoRa_reset(&loRa);
     printk(KERN_NOTICE "[ETHoLoRa][Init][NOTICE] LoRa reset.\n");
     status = LoRa_init(&loRa);

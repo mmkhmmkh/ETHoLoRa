@@ -75,12 +75,14 @@
 #define RegIrqFlags						0x12
 #define RegRxNbBytes					0x13
 #define RegPktRssiValue				0x1A
+#define RegRssiValue				0x1B
 #define	RegModemConfig1				0x1D
 #define RegModemConfig2				0x1E
 #define RegSymbTimeoutL				0x1F
 #define RegPreambleMsb				0x20
 #define RegPreambleLsb				0x21
 #define RegPayloadLength			0x22
+#define RegFifoRxByteAddr			0x25
 #define RegDetectOptimize           0x31
 #define RegDetectionThreshold       0x37
 #define RegDioMapping1				0x40
@@ -139,6 +141,7 @@ void LoRa_startReceiving(LoRa* _LoRa);
 uint8_t LoRa_receive(LoRa* _LoRa, uint8_t* data, uint8_t length);
 void LoRa_receive_IT(LoRa* _LoRa, uint8_t* data, uint8_t length);
 int LoRa_getRSSI(LoRa* _LoRa);
+int LoRa_getInstantRSSI(LoRa* _LoRa);
 
 uint16_t LoRa_init(LoRa* _LoRa);
 void LoRa_end(LoRa* _LoRa);

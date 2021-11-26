@@ -28,7 +28,7 @@ LoRa newLoRa(irq_handler_t handler) {
     LoRa new_LoRa;
 
     new_LoRa.frequency = 433;
-    new_LoRa.spredingFactor = SF_6;
+    new_LoRa.spredingFactor = SF_7;
     new_LoRa.bandWidth = BW_500KHz;
     new_LoRa.crcRate = CR_4_5;
     new_LoRa.power = POWER_20db;
@@ -423,6 +423,7 @@ uint8_t LoRa_transmit(LoRa *_LoRa, uint8_t *data, uint8_t length, uint16_t timeo
             LoRa_write(_LoRa, RegIrqFlags, 0xFF);
             HAL_Delay(1);
             LoRa_gotoMode(_LoRa, mode);
+//            LoRa_write(_LoRa, RegPayloadLength, 0xFF);
             return 1;
         } else {
             if (--timeout == 0) {
@@ -464,28 +465,36 @@ uint8_t LoRa_receive(LoRa *_LoRa, uint8_t *data, uint8_t length) {
         data[i] = 0;
 
     read = LoRa_read(_LoRa, RegIrqFlags);
-    if (_LoRa->spredingFactor == 6)
-        LoRa_write(_LoRa, RegPayloadLength, 0xFF);
 
 //    printk(KERN_NOTICE "LoRa REC Flag: %x\n", read);
     if ((read & 0x40) != 0) {
         LoRa_write(_LoRa, RegIrqFlags, 0xFF);
-        read = LoRa_read(_LoRa, RegFiFoRxCurrentAddr);
-        LoRa_write(_LoRa, RegFiFoAddPtr, read);
-        LoRa_gotoMode(_LoRa, STNBY_MODE);
-//        printk(KERN_ERR "Available: %d\n", LoRa_read(_LoRa, RegPayloadLength));
-        if (_LoRa->spredingFactor == 6)
-            number_of_bytes = LoRa_read(_LoRa, RegFiFo);
-        else
+
+//        if (_LoRa->spredingFactor == 6) {
+//            start_addr = LoRa_read(_LoRa, RegFifoRxByteAddr);
+//            printk("Start Addr: %x\n", start_addr);
+//            while (LoRa_read(_LoRa, RegFifoRxByteAddr) < start_addr + 1) {
+//                HAL_Delay(1);
+//            }
+//            printk("Start Addr2: %x\n", LoRa_read(_LoRa, RegFifoRxByteAddr));
+//            LoRa_write(_LoRa, RegFiFoAddPtr, start_addr);
+//            number_of_bytes = LoRa_read(_LoRa, RegFiFo);
+//            min = length >= number_of_bytes ? number_of_bytes : length;
+//            printk("Byte[0] (Size): %d\n", number_of_bytes);
+//            while (LoRa_read(_LoRa, RegFifoRxByteAddr) < start_addr + 1 + min) {
+//                HAL_Delay(1);
+//            }
+//            for (i = 0; i < min; i++)
+//                data[i] = LoRa_read(_LoRa, RegFiFo);
+//        } else {
+            LoRa_write(_LoRa, RegFiFoAddPtr, LoRa_read(_LoRa, RegFiFoRxCurrentAddr));
+//            LoRa_gotoMode(_LoRa, STNBY_MODE);
             number_of_bytes = LoRa_read(_LoRa, RegRxNbBytes);
-//        if (_LoRa->spredingFactor == 6)
-//            LoRa_write(_LoRa, RegPayloadLength, number_of_bytes);
-//        printk(KERN_ERR "Now Available: %d\n", LoRa_read(_LoRa, RegPayloadLength));
-        min = length >= number_of_bytes ? number_of_bytes : length;
-        for (i = 0; i < min; i++)
-            data[i] = LoRa_read(_LoRa, RegFiFo);
-//        LoRa_write(_LoRa, RegFiFoAddPtr, 0);
-        LoRa_gotoMode(_LoRa, RXCONTIN_MODE);
+            min = length >= number_of_bytes ? number_of_bytes : length;
+            for (i = 0; i < min; i++)
+                data[i] = LoRa_read(_LoRa, RegFiFo);
+//            LoRa_gotoMode(_LoRa, RXCONTIN_MODE);
+//        }
     }
     return min;
 }
@@ -500,6 +509,12 @@ uint8_t LoRa_receive(LoRa *_LoRa, uint8_t *data, uint8_t length) {
 int LoRa_getRSSI(LoRa *_LoRa) {
     uint8_t read;
     read = LoRa_read(_LoRa, RegPktRssiValue);
+    return -164 + read;
+}
+
+int LoRa_getInstantRSSI(LoRa *_LoRa) {
+    uint8_t read;
+    read = LoRa_read(_LoRa, RegRssiValue);
     return -164 + read;
 }
 
