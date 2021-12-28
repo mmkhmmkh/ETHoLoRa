@@ -47,7 +47,7 @@ MODULE_AUTHOR("MMKH <vbha.mmk@gmail.com>");
 
 #ifdef KERN_NEW
 unsigned char CLIENT_MAC[] = {
-        0x90, 0xA2, 0xDA, 0xFB, 0x1E, 0x6B
+        0x74, 0xD0, 0x2B, 0xC1, 0xAD, 0x72
 };
 #else
 unsigned char CLIENT_MAC[] = {
@@ -240,17 +240,28 @@ static void transmitter_handler(struct work_struct *work) {
 //                for (i = 0; i < data->total_length; i++) printk("%02x:", data->data[i]);
 //                printk("\n");
 
-                r = LoRa_transmit(&loRa, data->data, data->total_length, 10000);
 
+                waittime = LoRa_calculateTOA(&loRa, 255);
+
+                r = LoRa_transmit(&loRa, data->data, data->total_length, waittime * 5);
                 lastTransmission = _lastTransmission;
+
+                if (data->data[0] == 1) {
+                    // Last packet! So wait for receive
+                    mdelay(waittime);
+                }
 
                 waittime = LoRa_calculateTOA(&loRa, data->total_length);
                 printk(KERN_ERR "ToA time: %d ms\n", waittime);
-                get_random_bytes(&rnd, 1);
-                waittime = (waittime * rnd / 255);
-                printk(KERN_ERR "MA time: %d ms\n", waittime);
+                mdelay(waittime * 5 / 4);
+                if (data->data[0] == 1) {
+                    // Last packet! So wait for multiple access
+                    get_random_bytes(&rnd, 1);
+                    waittime = (waittime * rnd / 255);
+                    printk(KERN_ERR "MA time: %d ms\n", waittime);
+                    mdelay(waittime);
+                }
 
-                mdelay(waittime);
 
 
 
